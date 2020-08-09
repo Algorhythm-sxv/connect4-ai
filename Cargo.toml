@@ -1,0 +1,19 @@
+[package]
+name = "connect4_cli"
+version = "0.1.0"
+authors = ["Algorhythm-sxv"]
+edition = "2018"
+
+[lib]
+name = "connect4_ai"
+path = "src/lib.rs"
+
+[profile.dev]
+opt-level = 3
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+crossterm = "0.17.7"
+anyhow = "1.0.31"
+indicatif = "0.15.0"
+
