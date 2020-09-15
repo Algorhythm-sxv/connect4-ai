@@ -7,7 +7,7 @@ use crossterm::{
 
 use std::io::{stdout, Write};
 
-use crate::{WIDTH, HEIGHT};
+use crate::{HEIGHT, WIDTH};
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Cell {
     PlayerOne,
@@ -36,7 +36,7 @@ pub struct ArrayBoard {
     cells: [Cell; WIDTH * HEIGHT], // cells are stored left-to-right, bottom-to-top
     heights: [usize; WIDTH],
     pub player_one: bool,
-    pub game: String, 
+    pub game: String,
     num_moves: usize,
     pub state: GameState,
 }
@@ -52,7 +52,7 @@ impl ArrayBoard {
             state: GameState::Playing,
         }
     }
-    
+
     #[allow(unused)]
     pub fn from_str(moves: &str) -> Result<Self> {
         let mut board = Self::new();

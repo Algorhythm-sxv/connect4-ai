@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     println!("Welcome to Connect 4\n");
 
     let mut ai_players = (false, false);
-    
+
     // choose AI control of player 1
     loop {
         let mut buffer = String::new();
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
             _ => println!("Unknown answer given"),
         }
     }
-    
+
     // choose AI control of player 2
     loop {
         let mut buffer = String::new();
@@ -100,14 +100,14 @@ fn main() -> Result<()> {
                         let win_distance = solver.score_to_win_distance(score);
                         let move_string = if win_distance == 1 {"move"} else {"moves"};
                         if score > 0 {
-                            let player = if board.player_one{1}else{2};
+                            let player = if board.player_one { 1 } else { 2 };
                             println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
                         } else if score < 0 {
-                            let player = if board.player_one{2}else{1};
+                            let player = if board.player_one { 2 } else { 1 };
                             println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
                             
                         } else {
-                            let player = if board.player_one{1}else{2};
+                            let player = if board.player_one { 1 } else { 2 };
                             println!("Player {} can at best force a draw, {} {} remaining", player, win_distance, move_string);
                         }
 

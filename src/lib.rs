@@ -105,6 +105,13 @@ impl Solver {
     pub fn negamax(&mut self, mut alpha: i32, mut beta: i32) -> i32 {
         self.node_count += 1;
 
+        // check for next-move win for current player
+        for column in 0..WIDTH {
+            if self.board.playable(column) && self.board.check_winning_move(column) {
+                return ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32;
+            }
+        }
+
         // look for moves that don't give the opponent a next turn win
         let non_losing_moves = self.board.non_losing_moves();
         if non_losing_moves == 0 {
@@ -114,13 +121,6 @@ impl Solver {
         // check for draw
         if self.board.num_moves() == WIDTH * HEIGHT {
             return 0;
-        }
-
-        // check for next-move win for current player
-        for column in 0..WIDTH {
-            if self.board.playable(column) && self.board.check_winning_move(column) {
-                return ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32;
-            }
         }
 
         // check opening table at depth 12
@@ -212,9 +212,14 @@ impl Solver {
     pub fn top_level_search(&mut self, mut alpha: i32, beta: i32) -> (i32, usize) {
         self.node_count += 1;
 
-        // check for draw (no valid moves)
-        if self.board.num_moves() == WIDTH * HEIGHT {
-            return (0, WIDTH);
+        // check for win for current player on this move
+        for column in 0..WIDTH {
+            if self.board.playable(column) && self.board.check_winning_move(column) {
+                return (
+                    ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32,
+                    column,
+                );
+            }
         }
 
         // look for moves that don't give the opponent a next turn win
@@ -228,14 +233,9 @@ impl Solver {
             );
         }
 
-        // check for win for current player on this move
-        for column in 0..WIDTH {
-            if self.board.playable(column) && self.board.check_winning_move(column) {
-                return (
-                    ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32,
-                    column,
-                );
-            }
+        // check for draw (no valid moves)
+        if self.board.num_moves() == WIDTH * HEIGHT {
+            return (0, WIDTH);
         }
 
         let mut moves = MoveSorter::new();
