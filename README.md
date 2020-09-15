@@ -4,7 +4,8 @@ A game solver for connect 4 with a CLI frontend.
 It cannot be beaten unless its oppenent plays first and plays perfectly!
 
 ## Usage
-`cargo run --release` to play a game
+`cargo run --release` to play a game.
+
 The AI code exists in a library separate to the CLI frontend, so it can be embedded in other projects
 
 ## Details
