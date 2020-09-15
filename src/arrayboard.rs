@@ -31,11 +31,12 @@ pub enum GameState {
     PlayerTwoWin,
     Draw,
 }
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct ArrayBoard {
     cells: [Cell; WIDTH * HEIGHT], // cells are stored left-to-right, bottom-to-top
     heights: [usize; WIDTH],
-    player_one: bool,
+    pub player_one: bool,
+    pub game: String, 
     num_moves: usize,
     pub state: GameState,
 }
@@ -45,6 +46,7 @@ impl ArrayBoard {
             cells: [Cell::Empty; WIDTH * HEIGHT],
             heights: [0; WIDTH],
             player_one: true,
+            game: String::new(),
             num_moves: 0,
             state: GameState::Playing,
         }
@@ -74,7 +76,7 @@ impl ArrayBoard {
         }
         let column = column_one_indexed - 1;
         if !self.playable(column) {
-            return Err(anyhow!("Invalid move, column {} full", column));
+            return Err(anyhow!("Invalid move, column {} full", column_one_indexed));
         }
 
         if self.check_winning_move(column) {
@@ -91,6 +93,7 @@ impl ArrayBoard {
             };
         }
         self.play(column);
+        self.game.push_str(&column_one_indexed.to_string());
 
         Ok(self.state)
     }

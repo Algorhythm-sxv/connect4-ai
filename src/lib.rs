@@ -1,5 +1,5 @@
 mod transposition_table;
-use transposition_table::*;
+pub use transposition_table::*;
 
 mod bitboard;
 pub use bitboard::*;
@@ -7,18 +7,57 @@ pub use bitboard::*;
 mod arrayboard;
 pub use arrayboard::*;
 
-use std::sync::{Arc, Mutex};
-use std::thread;
+mod opening_database;
+pub use opening_database::*;
 
-const WIDTH: usize = 7;
-const HEIGHT: usize = 6;
-const MIN_SCORE: i32 = -((WIDTH * HEIGHT) as i32) / 2 + 3;
-const MAX_SCORE: i32 = ((WIDTH * HEIGHT) as i32 + 1) / 2 - 3;
+mod test;
 
 
+pub const WIDTH: usize = 7;
+pub const HEIGHT: usize = 6;
+pub const MIN_SCORE: i32 = -((WIDTH * HEIGHT) as i32) / 2 + 3;
+pub const MAX_SCORE: i32 = ((WIDTH * HEIGHT) as i32 + 1) / 2 - 3;
+
+
+struct MoveSorterColumn {
+    size: usize,
+    // move bitmap, column and score
+    moves: [(u64, usize, i32); WIDTH],
+}
+
+impl MoveSorterColumn {
+    pub fn new() -> Self {
+        Self {
+            size: 0,
+            moves: [(0, 0, 0); WIDTH],
+        }
+    }
+    pub fn push(&mut self, new_move: u64, column: usize, score: i32) {
+        let mut pos = self.size;
+        self.size += 1;
+        while pos != 0 && self.moves[pos - 1].2 > score {
+            self.moves[pos] = self.moves[pos - 1];
+            pos -= 1;
+        }
+        self.moves[pos] = (new_move, column, score);
+    }
+}
+impl Iterator for MoveSorterColumn {
+    type Item = (u64, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.size {
+            0 => None,
+            _ => {
+                self.size -= 1;
+                Some((self.moves[self.size].0, self.moves[self.size].1))
+            }
+        }
+    }
+}
 struct MoveSorter {
     size: usize,
-    // move bitmap and score
+    // move bitmap, score
     moves: [(u64, i32); WIDTH],
 }
 
@@ -42,7 +81,7 @@ impl MoveSorter {
 impl Iterator for MoveSorter {
     type Item = u64;
 
-    fn next(&mut self) -> Option<u64> {
+    fn next(&mut self) -> Option<Self::Item> {
         match self.size {
             0 => None,
             _ => {
@@ -58,11 +97,12 @@ pub struct Solver {
     board: BitBoard,
     pub node_count: usize,
     move_order: [usize; WIDTH],
-    transposition_table: SharedTranspositionTable,
+    pub transposition_table: TranspositionTable,
+    opening_database: Option<OpeningDatabase>,
 }
 
 impl Solver {
-    pub fn new(board: BitBoard) -> Self {
+    pub fn new(board: BitBoard, opening_database: Option<OpeningDatabase>) -> Self {
         let mut move_order = [0; WIDTH];
         for i in 0..WIDTH {
             move_order[i] = (WIDTH / 2) + (i % 2) * (i / 2 + 1) - (1 - i % 2) * (i / 2);
@@ -71,7 +111,8 @@ impl Solver {
             board,
             node_count: 0,
             move_order,
-            transposition_table: SharedTranspositionTable::new(),
+            transposition_table: TranspositionTable::new(),
+            opening_database
         }
     }
 
@@ -93,6 +134,18 @@ impl Solver {
         for column in 0..WIDTH {
             if self.board.playable(column) && self.board.check_winning_move(column) {
                 return ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32;
+            }
+        }
+
+        // check opening table at depth 12
+        if self.board.num_moves() == 12 {
+            if let Some(database) = &self.opening_database {
+                let book_score = database.get(self.board.huffman_code(), self.board.huffman_code_mirror());
+                if book_score == 33 {
+                    panic!("broken score for position '{:032b}', mirror '{:032b}'", self.board.huffman_code(), self.board.huffman_code_mirror());
+                } else {
+                    return book_score
+                }
             }
         }
 
@@ -124,7 +177,7 @@ impl Solver {
                     }
                 }
             }
-            max = value as i32 + MIN_SCORE - 1;
+            max = value + MIN_SCORE - 1;
         }
         if beta > max {
             // clamp beta to calculated upper bound
@@ -136,8 +189,9 @@ impl Solver {
         }
         let mut moves = MoveSorter::new();
         for i in (0..WIDTH).rev() {
-            let candidate = non_losing_moves & BitBoard::column_mask(self.move_order[i]);
-            if candidate != 0 {
+            let column = self.move_order[i];
+            let candidate = non_losing_moves & BitBoard::column_mask(column);
+            if candidate != 0 && self.board.playable(column) {
                 moves.push(candidate, self.board.move_score(candidate))
             }
         }
@@ -168,11 +222,77 @@ impl Solver {
         alpha
     }
 
-    pub fn solve(&mut self) -> i32 {
+    // top-level search bypasses transposition table and returns the best calculated move
+    pub fn top_level_search(&mut self, mut alpha: i32, beta: i32) -> (i32, usize) {
+        self.node_count += 1;
+
+        // check for draw (no valid moves)
+        if self.board.num_moves() == WIDTH * HEIGHT {
+            return (0, WIDTH);
+        }
+
+        // look for moves that don't give the opponent a next turn win
+        let non_losing_moves = self.board.non_losing_moves();
+        if non_losing_moves == 0 {
+            // return the first legal move found
+            let first = (0..WIDTH).find(|&i| self.board.playable(i)).unwrap();
+            return (
+                -((WIDTH * HEIGHT) as i32 - self.board.num_moves() as i32) / 2,
+                first,
+            );
+        }
+
+        // check for next-move win for current player
+        for column in 0..WIDTH {
+            if self.board.playable(column) && self.board.check_winning_move(column) {
+                return (
+                    ((WIDTH * HEIGHT + 1 - self.board.num_moves()) / 2) as i32,
+                    column,
+                );
+            }
+        }
+
+        let mut moves = MoveSorterColumn::new();
+        for i in (0..WIDTH).rev() {
+            let column = self.move_order[i];
+            let candidate = non_losing_moves & BitBoard::column_mask(column);
+            if candidate != 0 && self.board.playable(column) {
+                moves.push(candidate, column, self.board.move_score(candidate))
+            }
+        }
+        let mut best_score = MIN_SCORE;
+        let mut best_move = WIDTH;
+        for (move_bitmap, column) in moves {
+            let mut next = self.clone();
+            next.node_count = 0;
+
+            next.board.play(move_bitmap);
+            // the search window is flipped for the other player
+            let score = -next.negamax(-beta, -alpha);
+            self.node_count += next.node_count;
+            // if the actual score is better than beta, we can prune the tree
+            // because the other player will not pick this branch
+            if score >= beta {
+                return (score, column);
+            }
+            if score > alpha {
+                alpha = score;
+            }
+            if score > best_score {
+                best_score = score;
+                best_move = column;
+            }
+        }
+
+        (alpha, best_move)
+    }
+
+    pub fn solve(&mut self, silent: bool) -> (i32, usize) {
         let mut min = -(((WIDTH * HEIGHT) as i32) - self.board.num_moves() as i32) / 2;
         let mut max = (WIDTH * HEIGHT + 1 - self.board.num_moves()) as i32 / 2;
 
-        // iteratively narrow the search window
+        let mut next_move = WIDTH;
+        // iteratively narrow the search window for iterative deepening
         while min < max {
             let mut mid = min + (max - min) / 2;
             // tweak the search value for both negative and positive searches
@@ -181,257 +301,26 @@ impl Solver {
             } else if mid >= 0 && max / 2 > mid {
                 mid = max / 2
             }
+            if !silent {
+                println!(
+                    "Search depth: {}/{}, uncertainty: {}",
+                    (WIDTH * HEIGHT - self.board.num_moves()) as i32 - min.abs().min(max.abs()),
+                    WIDTH * HEIGHT - self.board.num_moves(),
+                    max - min
+                );
+            }
 
             // use a null-window to determine if the actual score is greater or less that mid
-            let r = self.negamax(mid, mid + 1);
+            let (r, best_move) = self.top_level_search(mid, mid + 1);
+            next_move = best_move;
             if r <= mid {
                 // actual score <= mid
                 max = r
             } else {
                 // actual score > mid
-                min = r
+                min = r;
             }
         }
-        min
-    }
-
-    pub fn par_solve(&mut self) -> (i32, usize) {
-        // WIDTH will always be an invalid column to play
-        let best = Arc::new(Mutex::new((MIN_SCORE, WIDTH)));
-        let mut threads = vec![];
-
-        for column in 0..WIDTH {
-            if self.board.playable(column) {
-                let mut next = self.clone();
-                let best = Arc::clone(&best);
-
-                threads.push(thread::spawn(move || {
-                    let move_bitmap = (next.board.board_mask + (1 << column * (HEIGHT + 1)))
-                        & BitBoard::column_mask(column);
-                    next.board.play(move_bitmap);
-
-                    let score = -next.solve();
-
-                    let mut best = best.lock().unwrap();
-                    if score > best.0 {
-                        *best = (score, column);
-                    }
-                }));
-            }
-        }
-        for child in threads {
-            let _ = child.join();
-        }
-        Arc::try_unwrap(best).unwrap().into_inner().unwrap()
-    }
-}
-
-#[cfg(test)]
-pub mod test {
-    use anyhow::{anyhow, Result};
-    use std::fs::File;
-    use std::io::{BufRead, BufReader};
-    use std::time::{Duration, Instant};
-
-    use crate::{ArrayBoard, BitBoard, Solver};
-
-    #[allow(unused)]
-    #[test]
-    pub fn test_print() -> Result<()> {
-        let mut buf: Vec<u8> = Vec::new();
-        let _ =
-            BufReader::new(File::open("test_data/Test_L3_R1")?).read_until(' ' as u8, &mut buf)?;
-        buf.pop();
-
-        let board = ArrayBoard::from_str(std::str::from_utf8(&buf)?)?;
-        board.display()?;
-        Ok(())
-    }
-
-    #[test]
-    pub fn end_easy() -> Result<()> {
-        let file = BufReader::new(File::open("test_data/Test_L3_R1")?);
-
-        let mut times = vec![];
-        let mut posis = vec![];
-
-        for line in file.split(b'\n').take(100) {
-            let buf = String::from_utf8(line?)?;
-            let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
-                    "invalid test data: {}",
-                    test_data.clone().collect::<String>()
-                ))?
-                .parse::<i32>()?;
-
-            let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board);
-            let start_time = Instant::now();
-            let calc = solver.solve();
-            let finish_time = Instant::now();
-            assert!(score == calc);
-            times.push(finish_time - start_time);
-            posis.push(solver.node_count);
-        }
-
-        println!(
-            "End-easy:\nMean time: {:.6}ms, Mean no. of positions: {}, kpos/s: {}",
-            (times.iter().sum::<Duration>() / times.len() as u32).as_secs_f64() * 1000.0,
-            posis.iter().sum::<usize>() as f64 / posis.len() as f64,
-            posis
-                .iter()
-                .zip(times.iter())
-                .map(|(p, t)| *p as f64 / t.as_secs_f64())
-                .sum::<f64>()
-                / (1000.0 * posis.len() as f64)
-        );
-        Ok(())
-    }
-
-    #[test]
-    pub fn middle_easy() -> Result<()> {
-        let file = BufReader::new(File::open("test_data/Test_L2_R1")?);
-
-        let mut times = vec![];
-        let mut posis = vec![];
-
-        for line in file.split(b'\n').take(100) {
-            let buf = String::from_utf8(line?)?;
-
-            let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
-                    "invalid test data: {}",
-                    test_data.clone().collect::<String>()
-                ))?
-                .parse::<i32>()?;
-
-            let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board);
-            let start_time = Instant::now();
-            let calc = solver.solve();
-            let finish_time = Instant::now();
-            assert!(score == calc);
-            times.push(finish_time - start_time);
-            posis.push(solver.node_count);
-        }
-
-        println!(
-            "Middle-easy\nMean time: {:.6}ms, Mean no. of positions: {}, kpos/s: {}",
-            (times.iter().sum::<Duration>() / times.len() as u32).as_secs_f64() * 1000.0,
-            posis.iter().sum::<usize>() as f64 / posis.len() as f64,
-            posis
-                .iter()
-                .zip(times.iter())
-                .map(|(p, t)| *p as f64 / t.as_secs_f64())
-                .sum::<f64>()
-                / (1000.0 * posis.len() as f64)
-        );
-        Ok(())
-    }
-
-    #[test]
-    pub fn middle_medium() -> Result<()> {
-        let file = BufReader::new(File::open("test_data/Test_L2_R2")?);
-
-        let mut times = vec![];
-        let mut posis = vec![];
-
-        for line in file.split(b'\n').take(20) {
-            let buf = String::from_utf8(line?)?;
-
-            let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
-                    "invalid test data: {}",
-                    test_data.clone().collect::<String>()
-                ))?
-                .parse::<i32>()?;
-
-            let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board);
-            let start_time = Instant::now();
-            let calc = solver.solve();
-            let finish_time = Instant::now();
-            assert!(score == calc);
-            times.push(finish_time - start_time);
-            posis.push(solver.node_count);
-        }
-
-        println!(
-            "Middle-medium\nMean time: {:.6}ms, Mean no. of positions: {}, kpos/s: {}",
-            (times.iter().sum::<Duration>() / times.len() as u32).as_secs_f64() * 1000.0,
-            posis.iter().sum::<usize>() as f64 / posis.len() as f64,
-            posis
-                .iter()
-                .zip(times.iter())
-                .map(|(p, t)| *p as f64 / t.as_secs_f64())
-                .sum::<f64>()
-                / (1000.0 * posis.len() as f64)
-        );
-        Ok(())
-    }
-
-    #[test]
-    pub fn begin_hard() -> Result<()> {
-        let file = BufReader::new(File::open("test_data/Test_L1_R3")?);
-
-        let mut times = vec![];
-        let mut posis = vec![];
-
-        for line in file.split(b'\n').take(1) {
-            let buf = String::from_utf8(line?)?;
-
-            let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
-                    "invalid test data: {}",
-                    test_data.clone().collect::<String>()
-                ))?
-                .parse::<i32>()?;
-
-            let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board);
-            let start_time = Instant::now();
-            let calc = solver.solve();
-            let finish_time = Instant::now();
-            assert!(score == calc);
-            times.push(finish_time - start_time);
-            posis.push(solver.node_count);
-        }
-
-        println!(
-            "Beginning-Hard\nMean time: {:.6}ms, Mean no. of positions: {}, kpos/s: {}",
-            (times.iter().sum::<Duration>() / times.len() as u32).as_secs_f64() * 1000.0,
-            posis.iter().sum::<usize>() as f64 / posis.len() as f64,
-            posis
-                .iter()
-                .zip(times.iter())
-                .map(|(p, t)| *p as f64 / t.as_secs_f64())
-                .sum::<f64>()
-                / (1000.0 * posis.len() as f64)
-        );
-        Ok(())
+        (min, next_move)
     }
 }

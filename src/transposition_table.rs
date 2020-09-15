@@ -1,3 +1,4 @@
+use std::{rc::Rc, cell::RefCell};
 use std::sync::{atomic::*, Arc};
 
 #[derive(Copy, Clone)]
@@ -11,19 +12,23 @@ impl Entry {
     }
 }
 
-const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value
+// const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
+const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
+
 #[derive(Clone)]
-pub struct TranspositionTable {
+struct TranspositionTableStorage {
     entries: Vec<Entry>,
 }
 
-impl TranspositionTable {
+impl TranspositionTableStorage {
     pub fn new() -> Self {
         Self {
             entries: vec![Entry::new(); TABLE_MAX_SIZE],
         }
     }
     pub fn set(&mut self, key: u64, value: u8) {
+        // let key = key as u32;
+        // let entry = Entry { key, value };
         let mut entry = Entry::new();
         entry.key = key as u32;
         entry.value = value;
@@ -38,6 +43,23 @@ impl TranspositionTable {
         } else {
             return 0;
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct TranspositionTable(Rc<RefCell<TranspositionTableStorage>>);
+
+impl TranspositionTable {
+    pub fn new() -> Self {
+        Self(Rc::new(RefCell::new(TranspositionTableStorage::new())))
+    }
+
+    pub fn set(&self, key: u64, value: u8) {
+        self.0.borrow_mut().set(key, value);
+    }
+
+    pub fn get(&self, key: u64) -> u8 {
+        self.0.borrow().get(key)
     }
 }
 
@@ -72,7 +94,7 @@ impl SharedTranspositionTable {
             entries: Arc::new(entries),
         }
     }
-    pub fn set(&mut self, key: u64, value: u8) {
+    pub fn set(&self, key: u64, value: u8) {
         let i = key as usize % self.entries.len();
         self.entries[i].store(key as u32 ^ value as u32, value);
     }
@@ -80,7 +102,7 @@ impl SharedTranspositionTable {
         let entry = &self.entries[key as usize % self.entries.len()];
         let data = entry.value.load(Ordering::Relaxed);
         if entry.key.load(Ordering::Relaxed) == key as u32 ^ data as u32 {
-            return data
+            return data;
         } else {
             return 0;
         }

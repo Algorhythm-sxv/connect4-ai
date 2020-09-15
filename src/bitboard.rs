@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use crate::{WIDTH, HEIGHT};
+use crate::{HEIGHT, WIDTH};
 
 #[derive(Copy, Clone)]
 struct StaticMasks {
@@ -73,6 +73,15 @@ impl BitBoard {
     pub fn column_mask(column: usize) -> u64 {
         ((1 << HEIGHT) - 1) << (column * (HEIGHT + 1))
     }
+    pub fn column_from_move(move_bitmap: u64) -> usize {
+        for column in 0..WIDTH {
+            if move_bitmap & Self::column_mask(column) != 0 {
+                return column;
+            }
+        }
+        // WIDTH is always an invalid column
+        WIDTH
+    }
 
     pub fn non_losing_moves(&self) -> u64 {
         let mut possible_moves = self.possible_moves();
@@ -91,7 +100,7 @@ impl BitBoard {
         possible_moves & !(opponent_winning_positions >> 1)
     }
 
-    fn possible_moves(&self) -> u64 {
+    pub fn possible_moves(&self) -> u64 {
         (self.board_mask + self.static_masks.bottom_mask) & self.static_masks.full_board_mask
     }
 
@@ -208,7 +217,55 @@ impl BitBoard {
         false
     }
 
+    // key for transposition table
     pub fn key(&self) -> u64 {
         self.player_mask + self.board_mask
+    }
+
+    pub fn huffman_code(&self) -> u32 {
+        self._huffman_code(false)
+    }
+    pub fn huffman_code_mirror(&self) -> u32 {
+        self._huffman_code(true)
+    }
+    // Huffman code for opening database
+    fn _huffman_code(&self, mirror: bool) -> u32 {
+        // 0 separates the tiles of each column
+        // 10 is a player 1 tile
+        // 11 is a player 2 tile
+        let mut code = 0;
+
+        let iter: Box<dyn Iterator<Item = usize>> = if mirror {
+            Box::new((0..WIDTH).rev())
+        } else {
+            Box::new(0..WIDTH)
+        };
+        for column in iter {
+            let column_mask = Self::column_mask(column);
+            // go over the top of the columns to add a separator when a row is full
+            for row in 0..=HEIGHT {
+                let row_mask = self.static_masks.bottom_mask << row;
+                let tile_mask = column_mask & row_mask;
+
+                // end of column
+                if self.board_mask & tile_mask == 0 {
+                    // append 0
+                    code <<= 1;
+                    break;
+                // tile present
+                } else {
+                    // player 1 tile
+                    if self.player_mask & tile_mask != 0 {
+                        // append 10
+                        code = (code << 2) + 0b10;
+                    // player 2 tile
+                    } else {
+                        // append 11
+                        code = (code << 2) + 0b11;
+                    }
+                }
+            }
+        }
+        code << 1
     }
 }
