@@ -3,33 +3,29 @@ use anyhow::{anyhow, Result};
 use crate::{HEIGHT, WIDTH};
 
 #[derive(Copy, Clone)]
-struct StaticMasks {
-    bottom_mask: u64,
-    full_board_mask: u64,
-}
-impl StaticMasks {
-    pub fn new() -> Self {
-        Self {
-            bottom_mask: Self::bottom(),
-            full_board_mask: Self::full_board(),
-        }
-    }
-    fn bottom() -> u64 {
+struct StaticMasks;
+mod static_masks {
+    use crate::{WIDTH, HEIGHT};
+
+    pub const fn bottom_mask() -> u64 {
         let mut mask = 0;
-        for column in 0..(WIDTH as u64) {
-            mask |= 1 << (column * (HEIGHT as u64 + 1))
+        let mut column = 0;
+        while column < WIDTH {
+            mask |= 1 << (column * (HEIGHT + 1));
+            column += 1;
         }
         mask
     }
-    fn full_board() -> u64 {
-        Self::bottom() * ((1 << HEIGHT as u64) - 1)
+    pub const fn full_board_mask() -> u64 {
+        bottom_mask() * ((1 << HEIGHT as u64) - 1)
     }
 }
 #[derive(Copy, Clone)]
 pub struct BitBoard {
-    pub player_mask: u64,
-    pub board_mask: u64,
-    static_masks: StaticMasks,
+    // mask of the current player's tiles
+    player_mask: u64,
+    // mask of all tiles
+    board_mask: u64,
     num_moves: usize,
 }
 impl BitBoard {
@@ -37,15 +33,14 @@ impl BitBoard {
         Self {
             player_mask: 0,
             board_mask: 0,
-            static_masks: StaticMasks::new(),
             num_moves: 0,
         }
     }
 
-    pub fn from_str(moves: &str) -> Result<Self> {
+    pub fn from_str<S: AsRef<str>>(moves: S) -> Result<Self> {
         let mut board = Self::new();
 
-        for column_char in moves.chars() {
+        for column_char in moves.as_ref().chars() {
             match column_char.to_digit(10).map(|c| c as usize) {
                 Some(column @ 1..=WIDTH) => {
                     let column = column - 1;
@@ -62,11 +57,11 @@ impl BitBoard {
         Ok(board)
     }
 
-    fn top_mask(column: usize) -> u64 {
+    pub fn top_mask(column: usize) -> u64 {
         1 << (column * (HEIGHT + 1) + (HEIGHT - 1))
     }
 
-    fn bottom_mask(column: usize) -> u64 {
+    pub fn bottom_mask(column: usize) -> u64 {
         1 << (column * (HEIGHT + 1))
     }
 
@@ -101,7 +96,7 @@ impl BitBoard {
     }
 
     pub fn possible_moves(&self) -> u64 {
-        (self.board_mask + self.static_masks.bottom_mask) & self.static_masks.full_board_mask
+        (self.board_mask + static_masks::bottom_mask()) & static_masks::full_board_mask()
     }
 
     // create a bitmap of open squares that complete alignments for the opponent
@@ -154,7 +149,7 @@ impl BitBoard {
         // find holes of the type ...O _ O O...
         r |= p & (player_mask << (HEIGHT + 2));
 
-        r & (self.static_masks.full_board_mask ^ self.board_mask)
+        r & (static_masks::full_board_mask() ^ self.board_mask)
     }
 
     pub fn move_score(&self, candidate: u64) -> i32 {
@@ -244,7 +239,7 @@ impl BitBoard {
             let column_mask = Self::column_mask(column);
             // go over the top of the columns to add a separator when a row is full
             for row in 0..=HEIGHT {
-                let row_mask = self.static_masks.bottom_mask << row;
+                let row_mask = static_masks::bottom_mask() << row;
                 let tile_mask = column_mask & row_mask;
 
                 // end of column

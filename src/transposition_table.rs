@@ -12,8 +12,8 @@ impl Entry {
     }
 }
 
-// const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
-const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
+const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
+// const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
 
 #[derive(Clone)]
 struct TranspositionTableStorage {

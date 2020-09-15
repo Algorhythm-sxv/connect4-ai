@@ -5,20 +5,7 @@ pub mod test {
     use std::io::{BufRead, BufReader};
     use std::time::{Duration, Instant};
 
-    use crate::{ArrayBoard, BitBoard, OpeningDatabase, Solver};
-
-    #[allow(unused)]
-    #[test]
-    pub fn test_print() -> Result<()> {
-        let mut buf: Vec<u8> = Vec::new();
-        let _ =
-            BufReader::new(File::open("test_data/Test_L3_R1")?).read_until(' ' as u8, &mut buf)?;
-        buf.pop();
-
-        let board = ArrayBoard::from_str(std::str::from_utf8(&buf)?)?;
-        board.display()?;
-        Ok(())
-    }
+    use crate::{BitBoard, OpeningDatabase, Solver};
 
     #[test]
     pub fn huffman_coding() -> Result<()> {
@@ -39,22 +26,22 @@ pub mod test {
         //     RR
         //     RY
         //R____RY >>> 676766776717
-        // 0x055daefc 
+        // 0x055daefc
         //     YY
         //     RY
         //     YY
         //     RR
         //     RY
         //_____RR >>> 777767676666
-        // 
+        //
         //
         //   Y
         //   R
         //   Y
         //Y  R
         //RRYYYRR >> 112364444475
-        let mut solver = Solver::new(BitBoard::from_str("676766776717")?, None);
-        let (calc, _) = solver.solve(true);
+        let mut solver = Solver::new(BitBoard::from_str("676766776717")?);
+        let (calc, _) = solver.solve();
 
         let score = openings.get(
             solver.board.huffman_code(),
@@ -62,8 +49,8 @@ pub mod test {
         );
         assert_eq!(score, calc);
 
-        solver = Solver::new(BitBoard::from_str("777767676666")?, None);
-        let (calc, _) = solver.solve(true);
+        solver = Solver::new(BitBoard::from_str("777767676666")?);
+        let (calc, _) = solver.solve();
 
         let score = openings.get(
             solver.board.huffman_code(),
@@ -71,9 +58,9 @@ pub mod test {
         );
 
         assert_eq!(calc, score);
-        
-        solver = Solver::new(BitBoard::from_str("112364444475")?, None);
-        let (calc, _) = solver.solve(true);
+
+        solver = Solver::new(BitBoard::from_str("112364444475")?);
+        let (calc, _) = solver.solve();
 
         let score = openings.get(
             solver.board.huffman_code(),
@@ -108,9 +95,9 @@ pub mod test {
                 .parse::<i32>()?;
 
             let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board, None);
+            let mut solver = Solver::new(board);
             let start_time = Instant::now();
-            let (calc, _) = solver.solve(true);
+            let (calc, _) = solver.solve();
             let finish_time = Instant::now();
             assert!(score == calc);
             times.push(finish_time - start_time);
@@ -155,9 +142,9 @@ pub mod test {
                 .parse::<i32>()?;
 
             let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board, None);
+            let mut solver = Solver::new(board);
             let start_time = Instant::now();
-            let (calc, _) = solver.solve(true);
+            let (calc, _) = solver.solve();
             let finish_time = Instant::now();
             assert!(score == calc);
             times.push(finish_time - start_time);
@@ -202,9 +189,9 @@ pub mod test {
                 .parse::<i32>()?;
 
             let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board, None);
+            let mut solver = Solver::new(board);
             let start_time = Instant::now();
-            let (calc, _best) = solver.solve(true);
+            let (calc, _best) = solver.solve();
             let finish_time = Instant::now();
             assert!(score == calc);
             times.push(finish_time - start_time);
@@ -249,9 +236,9 @@ pub mod test {
                 .parse::<i32>()?;
 
             let board = BitBoard::from_str(moves)?;
-            let mut solver = Solver::new(board, Some(OpeningDatabase::load()?));
+            let mut solver = Solver::new(board).with_opening_database(OpeningDatabase::load()?);
             let start_time = Instant::now();
-            let (calc, _best) = solver.solve(true);
+            let (calc, _best) = solver.solve();
             let finish_time = Instant::now();
             assert!(score == calc);
             times.push(finish_time - start_time);
@@ -275,9 +262,9 @@ pub mod test {
     #[test]
     pub fn full_search() -> Result<()> {
         let board = BitBoard::new();
-        let mut solver = Solver::new(board, Some(OpeningDatabase::load()?));
+        let mut solver = Solver::new(board).with_opening_database(OpeningDatabase::load()?);
         let start_time = Instant::now();
-        let (calc, best) = solver.solve(true);
+        let (calc, best) = solver.solve();
         let finish_time = Instant::now();
         let time = finish_time - start_time;
         let posis = solver.node_count;

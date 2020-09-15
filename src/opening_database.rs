@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::rc::Rc;
 
+use crate::{WIDTH, HEIGHT};
+
 const DATABASE_PATH: &str = "BookDeepDist.dat";
 const DATABASE_NUM_POSITIONS: usize = 4200899;
 
@@ -93,10 +95,10 @@ impl OpeningDatabaseStorage {
         // convert database value to local
         if value > 0 {
             let distance = 100 - value;
-            return 21 - ((12 + distance) / 2) as i32;
+            return (WIDTH * HEIGHT / 2) as i32 - ((12 + distance) / 2) as i32;
         } else if value < 0 {
             let distance = 100 + value;
-            return -22 + ((12 + distance) / 2) as i32;
+            return -((WIDTH * HEIGHT / 2 + 1) as i32) + ((12 + distance) / 2) as i32;
         } else {
             return 0;
         }

@@ -41,6 +41,7 @@ pub struct ArrayBoard {
     pub state: GameState,
 }
 impl ArrayBoard {
+    #[allow(unused)]
     pub fn new() -> Self {
         Self {
             cells: [Cell::Empty; WIDTH * HEIGHT],
@@ -51,7 +52,8 @@ impl ArrayBoard {
             state: GameState::Playing,
         }
     }
-
+    
+    #[allow(unused)]
     pub fn from_str(moves: &str) -> Result<Self> {
         let mut board = Self::new();
 

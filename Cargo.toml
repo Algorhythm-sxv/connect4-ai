@@ -18,4 +18,5 @@ opt-level = 3
 [dependencies]
 crossterm = "0.17.7"
 anyhow = "1.0.31"
+static_assertions = "1.1.0"
 
