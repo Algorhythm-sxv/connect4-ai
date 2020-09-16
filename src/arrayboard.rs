@@ -101,11 +101,7 @@ impl ArrayBoard {
     }
 
     pub fn check_draw_move(&self) -> bool {
-        if self.cells.iter().filter(|x| x.is_empty()).count() == 1 {
-            true
-        } else {
-            false
-        }
+        self.cells.iter().filter(|x| x.is_empty()).count() == 1
     }
 
     pub fn display(&self) -> Result<()> {
@@ -146,7 +142,7 @@ impl ArrayBoard {
         Ok(())
     }
     fn playable(&self, column: usize) -> bool {
-        return self.heights[column] < HEIGHT;
+        self.heights[column] < HEIGHT
     }
     pub fn play(&mut self, column: usize) {
         let player = if self.player_one {
@@ -166,13 +162,12 @@ impl ArrayBoard {
             Cell::PlayerTwo
         };
         // check vertical alignment
-        if self.heights[column] >= 3 {
-            if self.cells[column + WIDTH * (self.heights[column] - 1)] == player
-                && self.cells[column + WIDTH * (self.heights[column] - 2)] == player
-                && self.cells[column + WIDTH * (self.heights[column] - 3)] == player
-            {
-                return true;
-            }
+        if self.heights[column] >= 3
+            && self.cells[column + WIDTH * (self.heights[column] - 1)] == player
+            && self.cells[column + WIDTH * (self.heights[column] - 2)] == player
+            && self.cells[column + WIDTH * (self.heights[column] - 3)] == player
+        {
+            return true;
         }
 
         // check horizontal and diagonal alignment

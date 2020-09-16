@@ -9,7 +9,7 @@ pub mod test {
 
     #[test]
     pub fn huffman_coding() -> Result<()> {
-        let board = BitBoard::from_str("22244444")?;
+        let board = BitBoard::from_moves("22244444")?;
         let code = board.huffman_code();
 
         assert_eq!(code, 0b010111000111011101100000);
@@ -40,7 +40,7 @@ pub mod test {
         //   Y
         //Y  R
         //RRYYYRR >> 112364444475
-        let mut solver = Solver::new(BitBoard::from_str("676766776717")?);
+        let mut solver = Solver::new(BitBoard::from_moves("676766776717")?);
         let (calc, _) = solver.solve();
 
         let score = openings.get(
@@ -49,7 +49,7 @@ pub mod test {
         );
         assert_eq!(score, calc);
 
-        solver = Solver::new(BitBoard::from_str("777767676666")?);
+        solver = Solver::new(BitBoard::from_moves("777767676666")?);
         let (calc, _) = solver.solve();
 
         let score = openings.get(
@@ -59,7 +59,7 @@ pub mod test {
 
         assert_eq!(calc, score);
 
-        solver = Solver::new(BitBoard::from_str("112364444475")?);
+        solver = Solver::new(BitBoard::from_moves("112364444475")?);
         let (calc, _) = solver.solve();
 
         let score = openings.get(
@@ -94,7 +94,7 @@ pub mod test {
                 ))?
                 .parse::<i32>()?;
 
-            let board = BitBoard::from_str(moves)?;
+            let board = BitBoard::from_moves(moves)?;
             let mut solver = Solver::new(board);
             let start_time = Instant::now();
             let (calc, _) = solver.solve();
@@ -141,7 +141,7 @@ pub mod test {
                 ))?
                 .parse::<i32>()?;
 
-            let board = BitBoard::from_str(moves)?;
+            let board = BitBoard::from_moves(moves)?;
             let mut solver = Solver::new(board);
             let start_time = Instant::now();
             let (calc, _) = solver.solve();
@@ -188,7 +188,7 @@ pub mod test {
                 ))?
                 .parse::<i32>()?;
 
-            let board = BitBoard::from_str(moves)?;
+            let board = BitBoard::from_moves(moves)?;
             let mut solver = Solver::new(board);
             let start_time = Instant::now();
             let (calc, _best) = solver.solve();
@@ -235,7 +235,7 @@ pub mod test {
                 ))?
                 .parse::<i32>()?;
 
-            let board = BitBoard::from_str(moves)?;
+            let board = BitBoard::from_moves(moves)?;
             let mut solver = Solver::new(board).with_opening_database(OpeningDatabase::load()?);
             let start_time = Instant::now();
             let (calc, _best) = solver.solve();

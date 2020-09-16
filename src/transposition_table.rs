@@ -1,5 +1,5 @@
-use std::{rc::Rc, cell::RefCell};
 use std::sync::{atomic::*, Arc};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Copy, Clone)]
 struct Entry {
@@ -13,7 +13,7 @@ impl Entry {
 }
 
 const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
-// const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
+                                             // const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
 
 #[derive(Clone)]
 struct TranspositionTableStorage {
@@ -39,9 +39,9 @@ impl TranspositionTableStorage {
     pub fn get(&self, key: u64) -> u8 {
         let entry = self.entries[key as usize % self.entries.len()];
         if entry.key == key as u32 {
-            return entry.value;
+            entry.value
         } else {
-            return 0;
+            0
         }
     }
 }
@@ -60,6 +60,12 @@ impl TranspositionTable {
 
     pub fn get(&self, key: u64) -> u8 {
         self.0.borrow().get(key)
+    }
+}
+
+impl Default for TranspositionTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -102,9 +108,15 @@ impl SharedTranspositionTable {
         let entry = &self.entries[key as usize % self.entries.len()];
         let data = entry.value.load(Ordering::Relaxed);
         if entry.key.load(Ordering::Relaxed) == key as u32 ^ data as u32 {
-            return data;
+            data
         } else {
-            return 0;
+            0
         }
+    }
+}
+
+impl Default for SharedTranspositionTable {
+    fn default() -> Self {
+        Self::new()
     }
 }

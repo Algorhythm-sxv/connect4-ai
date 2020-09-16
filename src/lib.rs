@@ -1,5 +1,7 @@
 use static_assertions::*;
 
+use std::cmp::Ordering;
+
 mod transposition_table;
 pub use transposition_table::*;
 
@@ -328,12 +330,14 @@ impl Solver {
     }
 
     pub fn score_to_win_distance(&self, score: i32) -> usize {
-        if score == 0 {
-            return WIDTH * HEIGHT - self.board.num_moves();
-        } else if score > 0 {
-            return (WIDTH * HEIGHT / 2 + 1 - score as usize) - self.board.num_moves() / 2;
-        } else {
-            return (WIDTH * HEIGHT / 2 + 1) - (-score as usize) - self.board.num_moves() / 2;
+        match score.cmp(&0) {
+            Ordering::Equal => WIDTH * HEIGHT - self.board.num_moves(),
+            Ordering::Greater => {
+                (WIDTH * HEIGHT / 2 + 1 - score as usize) - self.board.num_moves() / 2
+            }
+            Ordering::Less => {
+                (WIDTH * HEIGHT / 2 + 1) - (-score as usize) - self.board.num_moves() / 2
+            }
         }
     }
 }

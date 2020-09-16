@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use std::cmp::Ordering;
 use std::io::{stdin, stdout, Write};
 
 use connect4_ai::*;
@@ -58,13 +59,12 @@ fn main() -> Result<()> {
             opening_database = Some(database);
         }
         Err(err) => match err.root_cause().downcast_ref::<std::io::Error>() {
-            Some(io_error) => match io_error.kind() {
-                std::io::ErrorKind::NotFound => {
-                    println!(
-                        "Opening database not found, expect early AI moves to take ~10 minutes"
-                    );
-                }
-                _ => {}
+            Some(io_error) => if let std::io::ErrorKind::NotFound = io_error.kind() {
+                println!(
+                    "Opening database not found, expect early AI moves to take ~10 minutes"
+                );
+            } else {
+                println!("Error reading opening database: {}", err.root_cause());
             },
             _ => println!("Error reading opening database: {}", err.root_cause()),
         },
@@ -88,7 +88,7 @@ fn main() -> Result<()> {
                         }
 
                         let mut solver = Solver::new_with_transposition_table(
-                            BitBoard::from_str(&board.game)?,
+                            BitBoard::from_moves(&board.game)?,
                             transposition_table.clone(),
                         );
                         if let Some(database) = opening_database.clone() {
@@ -99,16 +99,20 @@ fn main() -> Result<()> {
 
                         let win_distance = solver.score_to_win_distance(score);
                         let move_string = if win_distance == 1 {"move"} else {"moves"};
-                        if score > 0 {
-                            let player = if board.player_one { 1 } else { 2 };
-                            println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
-                        } else if score < 0 {
-                            let player = if board.player_one { 2 } else { 1 };
-                            println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
-                            
-                        } else {
-                            let player = if board.player_one { 1 } else { 2 };
-                            println!("Player {} can at best force a draw, {} {} remaining", player, win_distance, move_string);
+                        match score.cmp(&0) {
+                            Ordering::Greater =>  {
+                                let player = if board.player_one { 1 } else { 2 };
+                                println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
+                            },
+                            Ordering::Less => {
+                                let player = if board.player_one { 2 } else { 1 };
+                                println!("Player {} can force a win in at most {} {}.", player, win_distance, move_string);
+                                
+                            },
+                            Ordering::Equal => {
+                                let player = if board.player_one { 1 } else { 2 };
+                                println!("Player {} can at best force a draw, {} {} remaining", player, win_distance, move_string);
+                            }
                         }
 
                         println!("Best move: {}", best_move + 1);
@@ -120,7 +124,7 @@ fn main() -> Result<()> {
                         stdout().flush().expect("Failed to flush to stdout!");
                         let mut input_str = String::new();
                         stdin.read_line(&mut input_str)?;
-
+                        
                         match input_str.trim().parse::<usize>() {
                             Err(_) => {
                                 println!("Invalid number: {}", input_str);
@@ -130,14 +134,10 @@ fn main() -> Result<()> {
                         }
                     };
 
-                match board.play_checked(next_move) {
-                    Err(err) => {
-                        println!("{}", err);
-                        // try the move again
-                        continue;
-                    }
-                    // next move
-                    Ok(_) => {}
+                if let Err(err) = board.play_checked(next_move) {
+                    println!("{}", err);
+                    // try the move again
+                    continue;
                 }
             }
 

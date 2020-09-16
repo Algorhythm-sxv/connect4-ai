@@ -1,10 +1,11 @@
 use anyhow::Result;
 
+use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::rc::Rc;
 
-use crate::{WIDTH, HEIGHT};
+use crate::{HEIGHT, WIDTH};
 
 const DATABASE_PATH: &str = "BookDeepDist.dat";
 const DATABASE_NUM_POSITIONS: usize = 4200899;
@@ -70,37 +71,36 @@ impl OpeningDatabaseStorage {
             let code1 = *self.positions.get(pos1).unwrap_or(&0);
             let code2 = *self.positions.get(pos2).unwrap_or(&0);
 
-            if position_code < code1 {
+            match position_code.cmp(&code1) {
                 // overflow is acceptable as the Vec::get earlier guards against panic
-                pos1 = pos1.wrapping_sub(step);
-            } else if position_code > code1 {
-                // overflow is acceptable as the Vec::get earlier guards against panic
-                pos1 = pos1.wrapping_add(step);
-            } else {
-                value = self.values[pos1];
-                break;
+                Ordering::Less => pos1 = pos1.wrapping_sub(step),
+                Ordering::Greater => pos1 = pos1.wrapping_add(step),
+                Ordering::Equal => {
+                    value = self.values[pos1];
+                    break;
+                }
             }
-
-            if mirror_code < code2 {
+            match mirror_code.cmp(&code2) {
                 // overflow is acceptable as the Vec::get earlier guards against panic
-                pos2 = pos2.wrapping_sub(step);
-            } else if mirror_code > code2 {
-                // overflow is acceptable as the Vec::get earlier guards against panic
-                pos2 = pos2.wrapping_add(step);
-            } else {
-                value = self.values[pos2];
-                break;
+                Ordering::Less => pos2 = pos2.wrapping_sub(step),
+                Ordering::Greater => pos2 = pos2.wrapping_add(step),
+                Ordering::Equal => {
+                    value = self.values[pos2];
+                    break;
+                }
             }
         }
         // convert database value to local
-        if value > 0 {
-            let distance = 100 - value;
-            return (WIDTH * HEIGHT / 2) as i32 - ((12 + distance) / 2) as i32;
-        } else if value < 0 {
-            let distance = 100 + value;
-            return -((WIDTH * HEIGHT / 2 + 1) as i32) + ((12 + distance) / 2) as i32;
-        } else {
-            return 0;
+        match value.cmp(&0) {
+            Ordering::Greater => {
+                let distance = 100 - value;
+                (WIDTH * HEIGHT / 2) as i32 - ((12 + distance) / 2) as i32
+            }
+            Ordering::Less => {
+                let distance = 100 + value;
+                -((WIDTH * HEIGHT / 2 + 1) as i32) + ((12 + distance) / 2) as i32
+            }
+            Ordering::Equal => 0,
         }
     }
 }

@@ -2,10 +2,8 @@ use anyhow::{anyhow, Result};
 
 use crate::{HEIGHT, WIDTH};
 
-#[derive(Copy, Clone)]
-struct StaticMasks;
 mod static_masks {
-    use crate::{WIDTH, HEIGHT};
+    use crate::{HEIGHT, WIDTH};
 
     pub const fn bottom_mask() -> u64 {
         let mut mask = 0;
@@ -37,7 +35,7 @@ impl BitBoard {
         }
     }
 
-    pub fn from_str<S: AsRef<str>>(moves: S) -> Result<Self> {
+    pub fn from_moves<S: AsRef<str>>(moves: S) -> Result<Self> {
         let mut board = Self::new();
 
         for column_char in moves.as_ref().chars() {
@@ -47,7 +45,7 @@ impl BitBoard {
                     if !board.playable(column) {
                         return Err(anyhow!("Invalid move, column {} full", column + 1));
                     }
-                    let move_bitmap = (board.board_mask + (1 << column * (HEIGHT + 1)))
+                    let move_bitmap = (board.board_mask + (1 << (column * (HEIGHT + 1))))
                         & BitBoard::column_mask(column);
                     let _ = board.play(move_bitmap);
                 }
@@ -111,41 +109,41 @@ impl BitBoard {
         let mut r = (player_mask << 1) & (player_mask << 2) & (player_mask << 3);
 
         // horizontal
-        let mut p = (player_mask << (HEIGHT + 1)) & (player_mask << 2 * (HEIGHT + 1));
+        let mut p = (player_mask << (HEIGHT + 1)) & (player_mask << (2 * (HEIGHT + 1)));
         // find the right ends of 3-alignments
-        r |= p & (player_mask << 3 * (HEIGHT + 1));
+        r |= p & (player_mask << (3 * (HEIGHT + 1)));
         // find holes of the type ...O O _ O...
         r |= p & (player_mask >> (HEIGHT + 1));
 
-        p = (player_mask >> (HEIGHT + 1)) & (player_mask >> 2 * (HEIGHT + 1));
+        p = (player_mask >> (HEIGHT + 1)) & (player_mask >> (2 * (HEIGHT + 1)));
         // find the left ends of 3-alignments
-        r |= p & (player_mask >> 3 * (HEIGHT + 1));
+        r |= p & (player_mask >> (3 * (HEIGHT + 1)));
         // find holes of the type ...O _ O O...
         r |= p & (player_mask << (HEIGHT + 1));
 
         // diagonal /
-        p = (player_mask << HEIGHT) & (player_mask << 2 * HEIGHT);
+        p = (player_mask << HEIGHT) & (player_mask << (2 * HEIGHT));
         // find the right ends of 3-alignments
-        r |= p & (player_mask << 3 * (HEIGHT));
+        r |= p & (player_mask << (3 * (HEIGHT)));
         // find holes of the type ...O O _ O...
         r |= p & (player_mask >> (HEIGHT));
 
-        p = (player_mask >> (HEIGHT)) & (player_mask >> 2 * HEIGHT);
+        p = (player_mask >> (HEIGHT)) & (player_mask >> (2 * HEIGHT));
         // find the left ends of 3-alignments
-        r |= p & (player_mask >> 3 * (HEIGHT));
+        r |= p & (player_mask >> (3 * (HEIGHT)));
         // find holes of the type ...O _ O O...
         r |= p & (player_mask << (HEIGHT));
 
         // diagonal \
-        p = (player_mask << (HEIGHT + 2)) & (player_mask << 2 * (HEIGHT + 2));
+        p = (player_mask << (HEIGHT + 2)) & (player_mask << (2 * (HEIGHT + 2)));
         // find the right ends of 3-alignments
-        r |= p & (player_mask << 3 * (HEIGHT + 2));
+        r |= p & (player_mask << (3 * (HEIGHT + 2)));
         // find holes of the type ...O O _ O...
         r |= p & (player_mask >> (HEIGHT + 2));
 
-        p = (player_mask >> (HEIGHT + 2)) & (player_mask >> 2 * (HEIGHT + 2));
+        p = (player_mask >> (HEIGHT + 2)) & (player_mask >> (2 * (HEIGHT + 2)));
         // find the left ends of 3-alignments
-        r |= p & (player_mask >> 3 * (HEIGHT + 2));
+        r |= p & (player_mask >> (3 * (HEIGHT + 2)));
         // find holes of the type ...O _ O O...
         r |= p & (player_mask << (HEIGHT + 2));
 
@@ -172,7 +170,7 @@ impl BitBoard {
         self.num_moves += 1;
     }
     pub fn check_winning_move(&self, column: usize) -> bool {
-        let mut pos = self.player_mask.clone();
+        let mut pos = self.player_mask;
         // play the move on the clone of the board, keeping the current player
         pos |= (self.board_mask + Self::bottom_mask(column)) & Self::column_mask(column);
 
@@ -262,5 +260,11 @@ impl BitBoard {
             }
         }
         code << 1
+    }
+}
+
+impl Default for BitBoard {
+    fn default() -> Self {
+        Self::new()
     }
 }
