@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::{WIDTH, HEIGHT};
 
-const DATABASE_PATH: &str = "BookDeepDist.dat";
+const DATABASE_PATH: &str = "bookDeepDist.dat";
 const DATABASE_NUM_POSITIONS: usize = 4200899;
 
 #[derive(Clone)]
