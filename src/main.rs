@@ -17,6 +17,44 @@ fn main() -> Result<()> {
 
     println!("Welcome to Connect 4\n");
 
+    // check for opening database
+    let mut opening_database: Option<OpeningDatabase> = None;
+    let opening_database_result = OpeningDatabase::load();
+    match opening_database_result {
+        Ok(database) => {
+            opening_database = Some(database);
+        }
+        Err(err) => match err.root_cause().downcast_ref::<std::io::Error>() {
+            Some(io_error) => if let std::io::ErrorKind::NotFound = io_error.kind() {
+                loop {
+                    print!(
+                        "Opening database not found, would you like to generate one? (takes a LONG time)\ny/n: "
+                    );
+                    stdout().flush().expect("failed to flush to stdout!");
+
+                    let mut buffer = String::new();
+                    stdin.read_line(&mut buffer)?;
+
+                    match buffer.to_lowercase().chars().next() {
+                        Some(_letter @ 'y') => {
+                            OpeningDatabase::generate()?;
+                            return Ok(());
+                            // break;
+                        },
+                        Some(_letter @ 'n') => {
+                            println!("Skipping database generation, expect early AI moves to take ~10 minutes");
+                            break;
+                        },
+                        _ => println!("Unknown answer given"),
+                    }
+                }
+            } else {
+                println!("Error reading opening database: {}", err.root_cause());
+            },
+            _ => println!("Error reading opening database: {}", err.root_cause()),
+        },
+    }
+
     let mut ai_players = (false, false);
 
     // choose AI control of player 1
@@ -45,29 +83,10 @@ fn main() -> Result<()> {
             Some(_letter @ 'y') => {
                 ai_players.1 = true;
                 break;
-            }
+            },
             Some(_letter @ 'n') => break,
             _ => println!("Unknown answer given"),
         }
-    }
-
-    // check for opening database
-    let mut opening_database: Option<OpeningDatabase> = None;
-    let opening_database_result = OpeningDatabase::load();
-    match opening_database_result {
-        Ok(database) => {
-            opening_database = Some(database);
-        }
-        Err(err) => match err.root_cause().downcast_ref::<std::io::Error>() {
-            Some(io_error) => if let std::io::ErrorKind::NotFound = io_error.kind() {
-                println!(
-                    "Opening database not found, expect early AI moves to take ~10 minutes"
-                );
-            } else {
-                println!("Error reading opening database: {}", err.root_cause());
-            },
-            _ => println!("Error reading opening database: {}", err.root_cause()),
-        },
     }
 
     // game loop

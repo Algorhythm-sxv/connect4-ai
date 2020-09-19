@@ -1,5 +1,5 @@
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use anyhow::{anyhow, Result};
     use std::fs::File;
     use std::io::{BufRead, BufReader};
@@ -44,8 +44,10 @@ pub mod test {
         let (calc, _) = solver.solve();
 
         let score = openings.get(
-            solver.board.huffman_code(),
-            solver.board.huffman_code_mirror(),
+            solver
+                .board
+                .huffman_code()
+                .min(solver.board.huffman_code_mirror()),
         );
         assert_eq!(score, calc);
 
@@ -53,8 +55,10 @@ pub mod test {
         let (calc, _) = solver.solve();
 
         let score = openings.get(
-            solver.board.huffman_code(),
-            solver.board.huffman_code_mirror(),
+            solver
+                .board
+                .huffman_code()
+                .min(solver.board.huffman_code_mirror()),
         );
 
         assert_eq!(calc, score);
@@ -63,8 +67,10 @@ pub mod test {
         let (calc, _) = solver.solve();
 
         let score = openings.get(
-            solver.board.huffman_code(),
-            solver.board.huffman_code_mirror(),
+            solver
+                .board
+                .huffman_code()
+                .min(solver.board.huffman_code_mirror()),
         );
 
         assert_eq!(calc, score);
@@ -82,16 +88,20 @@ pub mod test {
         for line in file.split(b'\n') {
             let buf = String::from_utf8(line?)?;
             let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
+            let moves = test_data.next().ok_or_else(|| {
+                anyhow!(
                     "invalid test data: {}",
                     test_data.clone().collect::<String>()
-                ))?
+                )
+            })?;
+            let score = test_data
+                .next()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "invalid test data: {}",
+                        test_data.clone().collect::<String>()
+                    )
+                })?
                 .parse::<i32>()?;
 
             let board = BitBoard::from_moves(moves)?;
@@ -129,16 +139,20 @@ pub mod test {
             let buf = String::from_utf8(line?)?;
 
             let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
+            let moves = test_data.next().ok_or_else(|| {
+                anyhow!(
                     "invalid test data: {}",
                     test_data.clone().collect::<String>()
-                ))?
+                )
+            })?;
+            let score = test_data
+                .next()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "invalid test data: {}",
+                        test_data.clone().collect::<String>()
+                    )
+                })?
                 .parse::<i32>()?;
 
             let board = BitBoard::from_moves(moves)?;
@@ -176,16 +190,20 @@ pub mod test {
             let buf = String::from_utf8(line?)?;
 
             let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
+            let moves = test_data.next().ok_or_else(|| {
+                anyhow!(
                     "invalid test data: {}",
                     test_data.clone().collect::<String>()
-                ))?
+                )
+            })?;
+            let score = test_data
+                .next()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "invalid test data: {}",
+                        test_data.clone().collect::<String>()
+                    )
+                })?
                 .parse::<i32>()?;
 
             let board = BitBoard::from_moves(moves)?;
@@ -223,16 +241,20 @@ pub mod test {
             let buf = String::from_utf8(line?)?;
 
             let mut test_data = buf.split_whitespace();
-            let moves = test_data.next().ok_or(anyhow!(
-                "invalid test data: {}",
-                test_data.clone().collect::<String>()
-            ))?;
-            let score = test_data
-                .next()
-                .ok_or(anyhow!(
+            let moves = test_data.next().ok_or_else(|| {
+                anyhow!(
                     "invalid test data: {}",
                     test_data.clone().collect::<String>()
-                ))?
+                )
+            })?;
+            let score = test_data
+                .next()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "invalid test data: {}",
+                        test_data.clone().collect::<String>()
+                    )
+                })?
                 .parse::<i32>()?;
 
             let board = BitBoard::from_moves(moves)?;

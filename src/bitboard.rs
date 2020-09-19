@@ -39,20 +39,59 @@ impl BitBoard {
         let mut board = Self::new();
 
         for column_char in moves.as_ref().chars() {
+            // only play available moves
             match column_char.to_digit(10).map(|c| c as usize) {
                 Some(column @ 1..=WIDTH) => {
                     let column = column - 1;
                     if !board.playable(column) {
                         return Err(anyhow!("Invalid move, column {} full", column + 1));
                     }
+                    // abort if the position is won at any point
+                    if board.check_winning_move(column) {
+                        return Err(anyhow!("Invalid position, game is over"));
+                    }
                     let move_bitmap = (board.board_mask + (1 << (column * (HEIGHT + 1))))
                         & BitBoard::column_mask(column);
-                    let _ = board.play(move_bitmap);
+                    board.play(move_bitmap);
                 }
                 _ => return Err(anyhow!("could not parse '{}' as a valid move", column_char)),
             }
         }
         Ok(board)
+    }
+
+    // for database generation, assumes all moves are in range
+    pub fn from_slice(moves: &[usize]) -> Result<Self, ()> {
+        let mut board = Self::new();
+        for &column in moves.iter() {
+            if !board.playable(column) {
+                return Err(());
+            }
+            // abort if the position is won at any point
+            if board.check_winning_move(column) {
+                return Err(());
+            }
+            let move_bitmap =
+                (board.board_mask + (1 << (column * (HEIGHT + 1)))) & BitBoard::column_mask(column);
+            board.play(move_bitmap);
+        }
+        Ok(board)
+    }
+
+    pub fn from_masks(player_mask: u64, board_mask: u64, num_moves: usize) -> Self {
+        Self {
+            player_mask,
+            board_mask,
+            num_moves,
+        }
+    }
+
+    pub fn player_mask(&self) -> u64 {
+        self.player_mask
+    }
+
+    pub fn board_mask(&self) -> u64 {
+        self.board_mask
     }
 
     pub fn top_mask(column: usize) -> u64 {

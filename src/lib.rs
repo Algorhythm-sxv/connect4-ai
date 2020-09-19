@@ -59,7 +59,7 @@ impl Iterator for MoveSorter {
     }
 }
 
-const fn move_order() -> [usize; WIDTH] {
+pub const fn move_order() -> [usize; WIDTH] {
     let mut move_order = [0; WIDTH];
     let mut i = 0;
     while i < WIDTH {
@@ -125,10 +125,10 @@ impl Solver {
             return 0;
         }
 
-        // check opening table at depth 12
-        if self.board.num_moves() == 12 {
+        // check opening table at appropriate depth
+        if self.board.num_moves() == DATABASE_DEPTH {
             if let Some(database) = &self.opening_database {
-                return database.get(self.board.huffman_code(), self.board.huffman_code_mirror());
+                return database.get(self.board.huffman_code().min(self.board.huffman_code_mirror()));
             }
         }
 
