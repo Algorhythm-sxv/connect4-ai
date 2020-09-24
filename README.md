@@ -19,5 +19,6 @@ This agent uses a classical game-tree search with various optimisations:
 On my machine (AMD Ryzen 5 1600) any position can be solved in under 1 second.
 
 ## Future improvements
+- Add documentation
+- Add WASM target for the web
 - Multithreading with the Lazy SMP technique
-- Adding functionality to generate the opening book from scratch
