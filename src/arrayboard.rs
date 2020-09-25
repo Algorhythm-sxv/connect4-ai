@@ -7,7 +7,9 @@ use crossterm::{
 
 use std::io::{stdout, Write};
 
-use crate::{HEIGHT, WIDTH};
+const HEIGHT: usize = 6;
+const WIDTH: usize = 7;
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Cell {
     PlayerOne,
