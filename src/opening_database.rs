@@ -1,3 +1,6 @@
+//! A searchable store of Connect 4 positions to speed up early-game searches
+//!
+
 use anyhow::Result;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use indicatif::*;
@@ -11,21 +14,59 @@ use std::sync::mpsc::*;
 use std::thread;
 use std::time::*;
 
-use crate::*;
+use crate::{bitboard::*, solver::*, HEIGHT, WIDTH};
 
+/// Hard-coded database path
 pub const DATABASE_PATH: &str = "opening_database.bin";
+/// Hard-coded temp file path
 pub const TEMP_FILE_PATH: &str = "temp_positions.bin";
+/// Hard-coded database depth
 pub const DATABASE_DEPTH: usize = 12;
+/// Hard-coded database size
 pub const DATABASE_NUM_POSITIONS: usize = 4200899;
 
+/// A shared, immutable, non-thread-safe opening database
+///
+/// # Notes
+/// The database stores all 'unique' positions with exactly 12 tiles played and their scores.
+/// In this case 'unique' means a position whose mirror image is not already in the database
+/// and does not have any moves that end the game on the next turn, as the game-tree search
+/// short-circuits in these cases before checking the database.
+///
+/// Positions are stored using a Huffman code of the board (4 bytes) and 1 byte representing
+/// the signed score, for a total size of ~20MB. The entries are stored in ascending numeric order
+/// of the Huffman code to allow binary search.
+///
+/// For details of the Huffman code and score, see [`BitBoard`] and [`Solver`].
+///
+/// The database contains a `Rc` internally, allowing cheap cloning.
+///
+/// [`BitBoard`]: ../bitboard/struct.BitBoard.html#huffman-codes
+/// [`Solver`]: ../solver/struct.Solver.html#position-scoring
 #[derive(Clone)]
 pub struct OpeningDatabase(Rc<OpeningDatabaseStorage>);
 
 impl OpeningDatabase {
+    /// Try to load a database from the hard-coded file path into memory
     pub fn load() -> Result<Self> {
         Ok(Self(Rc::new(OpeningDatabaseStorage::load()?)))
     }
 
+    /// Retrieve the score for a position, given as a huffman code
+    ///
+    /// Returns `None` if the position is not found in the database, 
+    /// see [Notes] for details of stored positions
+    ///
+    /// [Notes]: #Notes
+    pub fn get(&self, position_code: u32) -> Option<i32> {
+        self.0.get(position_code)
+    }
+
+    /// Generate an opening database at the hard-coded depth and path
+    ///
+    /// # Warning
+    /// This procedure is very computationally intensive; tested on a
+    /// Ryzen 5 1600 @ 3.2GHz generation took 23 hours at 100% CPU usage on all cores
     pub fn generate() -> Result<()> {
         let start = Instant::now();
         let mut next_time = start;
@@ -78,7 +119,7 @@ impl OpeningDatabase {
                             {
                                 // both mirrors will push the same huffman code, we will dedup later
                                 positions.push((
-                                    board.huffman_code().min(board.huffman_code_mirror()),
+                                    board.huffman_code(),
                                     board.player_mask(),
                                     board.board_mask(),
                                 ));
@@ -185,7 +226,7 @@ impl OpeningDatabase {
             positions.par_iter().for_each_with(
                 tx.clone(),
                 |tx, (huffman_code, player_mask, board_mask)| {
-                    let board = BitBoard::from_masks(*player_mask, *board_mask, 12);
+                    let board = BitBoard::from_parts(*player_mask, *board_mask, 12);
 
                     let mut solver = Solver::new(board);
                     let (score, _) = solver.solve();
@@ -253,7 +294,7 @@ impl OpeningDatabase {
 }
 
 #[derive(Clone)]
-pub struct OpeningDatabaseStorage {
+struct OpeningDatabaseStorage {
     positions: Vec<u32>,
     values: Vec<i8>,
 }
@@ -278,13 +319,13 @@ impl OpeningDatabaseStorage {
         Ok(Self { positions, values })
     }
 
-    pub fn get(&self, position_code: u32) -> i32 {
+    pub fn get(&self, position_code: u32) -> Option<i32> {
         // variables for binary search state
         let mut step = DATABASE_NUM_POSITIONS - 1;
         let mut pos1 = step;
 
         // invalid value
-        let mut value = -1;
+        let mut value = -99;
 
         // Binary search
         while step > 0 {
@@ -309,14 +350,10 @@ impl OpeningDatabaseStorage {
                 }
             }
         }
-        value as i32
-    }
-}
-
-impl std::ops::Deref for OpeningDatabase {
-    type Target = OpeningDatabaseStorage;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+        if value != -99 {
+            Some(value as i32)
+        } else {
+            None
+        }
     }
 }

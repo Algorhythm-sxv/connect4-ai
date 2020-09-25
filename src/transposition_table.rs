@@ -1,3 +1,5 @@
+//! A transposition table to cache the results of Connect 4 game tree searches.
+
 use std::sync::{atomic::*, Arc};
 use std::{cell::RefCell, rc::Rc};
 
@@ -12,8 +14,9 @@ impl Entry {
     }
 }
 
-const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
-                                             // const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
+/// The capacity of the transposition table in entries. Prime values minimise hash collisions
+pub const TABLE_MAX_SIZE: usize = (1 << 23) + 9; // prime value minimises hash collisions
+// pub const TABLE_MAX_SIZE: usize = (1 << 24) + 13; // prime value minimises hash collisions
 
 #[derive(Clone)]
 struct TranspositionTableStorage {
@@ -46,18 +49,35 @@ impl TranspositionTableStorage {
     }
 }
 
+/// A shared, non-thread-safe transposition table
+///
+/// # Notes
+///
+/// This table uses `Rc<RefCell<...>>` internally to allow cheap cloning
+/// and sharing between [`Solver`] instances on a single thread
+///
+/// **The table has a fixed capacity of ~42MB and key collisions will overwrite the previous
+/// value**
+///
+/// See [`BitBoard`] for a description of the key values and [`Solver`] for a description of the values
+///
+/// [`BitBoard`]: ../bitboard/struct.BitBoard.html#board-keys
+/// [`Solver`]: ../solver/struct.Solver.html#position-scoring
 #[derive(Clone)]
 pub struct TranspositionTable(Rc<RefCell<TranspositionTableStorage>>);
 
 impl TranspositionTable {
+    /// Creates an empty transposition table
     pub fn new() -> Self {
         Self(Rc::new(RefCell::new(TranspositionTableStorage::new())))
     }
 
+    /// Set a key-value pair in the transposition table
     pub fn set(&self, key: u64, value: u8) {
         self.0.borrow_mut().set(key, value);
     }
 
+    /// Retrieve a value from the transposition table
     pub fn get(&self, key: u64) -> u8 {
         self.0.borrow().get(key)
     }
@@ -86,6 +106,7 @@ impl SharedEntry {
     }
 }
 
+#[doc(hidden)]
 #[derive(Clone)]
 pub struct SharedTranspositionTable {
     entries: Arc<Vec<SharedEntry>>,

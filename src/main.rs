@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::cmp::Ordering;
 use std::io::{stdin, stdout, Write};
 
-use connect4_ai::*;
+use connect4_ai::{transposition_table::*, opening_database::*, solver::*, bitboard::*};
 
 mod arrayboard;
 use arrayboard::*;

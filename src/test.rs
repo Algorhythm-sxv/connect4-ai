@@ -5,7 +5,7 @@ pub mod tests {
     use std::io::{BufRead, BufReader};
     use std::time::{Duration, Instant};
 
-    use crate::{BitBoard, OpeningDatabase, Solver};
+    use crate::{bitboard::BitBoard, opening_database::OpeningDatabase, solver::Solver};
 
     #[test]
     pub fn huffman_coding() -> Result<()> {
@@ -43,35 +43,20 @@ pub mod tests {
         let mut solver = Solver::new(BitBoard::from_moves("676766776717")?);
         let (calc, _) = solver.solve();
 
-        let score = openings.get(
-            solver
-                .board
-                .huffman_code()
-                .min(solver.board.huffman_code_mirror()),
-        );
+        let score = openings.get(solver.huffman_code()).unwrap();
         assert_eq!(score, calc);
 
         solver = Solver::new(BitBoard::from_moves("777767676666")?);
         let (calc, _) = solver.solve();
 
-        let score = openings.get(
-            solver
-                .board
-                .huffman_code()
-                .min(solver.board.huffman_code_mirror()),
-        );
+        let score = openings.get(solver.huffman_code()).unwrap();
 
         assert_eq!(calc, score);
 
         solver = Solver::new(BitBoard::from_moves("112364444475")?);
         let (calc, _) = solver.solve();
 
-        let score = openings.get(
-            solver
-                .board
-                .huffman_code()
-                .min(solver.board.huffman_code_mirror()),
-        );
+        let score = openings.get(solver.huffman_code()).unwrap();
 
         assert_eq!(calc, score);
 
